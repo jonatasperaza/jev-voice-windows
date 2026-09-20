@@ -1,5 +1,192 @@
 # Jev Voice Windows
 
+*[Português ↓](#jev-voice-windows-pt-br)*
+
+Control Windows by voice: speech → local transcription with
+[faster-whisper](https://github.com/SYSTRAN/faster-whisper) (runs on
+your GPU if you have an NVIDIA one) → typed decision from
+[Jev](https://typesafe.ai) (TypeSafe AI, "System One") → action on
+Windows (open app, open site, type text, keystroke, system action).
+
+Inspired by the `jev-voice-control`, `jev-voice` and `jev-mac-voice`
+projects for macOS, adapted for Windows using Electron + PowerShell (no
+compiled native dependencies on the Windows side).
+
+## How it works
+
+```
+microphone (one hotkey press starts listening)
+      │  python/whisper_worker.py — faster-whisper (GPU/CUDA, CPU fallback)
+      │  Python process stays alive for the whole app, model loads once
+      ▼
+   transcribed text (RMS endpointing: detects speech end on its own)
+      │  clauseSplitter.js (splits "open notepad and type ..." into 2 parts)
+      ▼
+   clauses
+      │  POST https://api.typesafe.ai/v1/systemone  (Jev)
+      │  { model: "jev-latest", state: {...}, questions: {...} }
+      ▼
+   typed decision (noul/choice/score) + confidence per question
+      │  if confidence >= threshold
+      │  if app/site not found, tries knownSites.js (instagram, x, youtube, ...)
+      ▼
+   executor.js → PowerShell (Start-Process, SendKeys, etc.)
+```
+
+A transparent, always-on-top overlay shows live status (loading model,
+listening, thinking, executing).
+
+## Prerequisites
+
+1. **Node.js** 18+ and **npm**.
+2. **Python** 3.10+ with `pip` (only used for the local voice worker).
+3. **NVIDIA GPU** (optional but recommended — the worker falls back to
+   CPU on its own if it can't find CUDA, just slower).
+4. A **Jev API key** (TypeSafe AI), from your early access.
+
+## Install
+
+```powershell
+git clone <this-repo>
+cd jev-voice-windows
+npm install
+copy .env.example .env
+```
+
+### Voice worker (Python)
+
+```powershell
+cd python
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+
+# If you have an NVIDIA GPU, install the CUDA runtime via pip (avoids
+# installing the whole CUDA Toolkit):
+.venv\Scripts\pip install nvidia-cublas-cu12 nvidia-cudnn-cu12
+
+cd ..
+```
+
+Edit `.env` (from `.env.example`) and fill in at least:
+
+```ini
+TYPESAFE_API_KEY=your_key_here
+WHISPER_PYTHON=python/.venv/Scripts/python.exe
+```
+
+On first run, `faster-whisper` downloads the model weights
+(`large-v3-turbo` by default, ~1.5GB) from the Hugging Face Hub and
+caches them locally — this only happens once.
+
+## Running
+
+```powershell
+npm start
+```
+
+A tray icon appears and a status bar shows up at the top of the
+screen. On first run, wait for the overlay to leave "Loading voice
+model" (can take ~1min loading Whisper on the GPU). Then press the
+hotkey (`Ctrl+Space` by default) **once** to start listening — the
+worker detects on its own when you stopped talking. Say something
+like:
+
+> "open notepad"
+> "open spotify and then play music" *(each clause becomes a separate call to Jev)*
+> "open instagram"
+> "lock the screen"
+
+## Supported actions today
+
+- `open_app` — opens an installed program by name (via `Get-StartApps`)
+- `open_url` — opens a known site (Instagram, X, YouTube, Gmail,
+  WhatsApp Web, Netflix, TikTok, LinkedIn, GitHub, Reddit, Amazon,
+  Mercado Livre, Outlook, Discord, Telegram — see `src/jev/knownSites.js`)
+- `system_action` — `lock`, `sleep`, `mute`, `volume_up`, `volume_down`, `screenshot`
+
+> **Known limitation:** `type_text` and `keystroke` exist in
+> `executor.js`, but Jev (System One) only returns categorical answers
+> (yes/no, pick one option, numeric score) — it doesn't generate free
+> text. There's currently no reliable way to get "what text to type" or
+> "which shortcut to press" out of it; these two actions barely fire
+> today.
+
+To add new apps/sites/actions: installed apps work automatically (read
+from Windows); sites go in `src/jev/knownSites.js`; new system actions
+go in `SYSTEM_ACTIONS` (`src/windows/executor.js`) and in the
+`system_action` `criteria` (`src/jev/client.js`).
+
+## Building an installer (.exe)
+
+```powershell
+npm run dist
+```
+
+Generates an NSIS installer in `dist/` via `electron-builder`. Add an
+`.ico` icon at `assets/icon.ico` before packaging (the app runs
+without it, but the installer will lack a custom icon). The Python
+worker is **not** bundled automatically — the app currently expects to
+find the venv at `python/.venv` next to the code.
+
+## Project structure
+
+```
+src/
+  main.js                    # Electron main process, orchestrates the flow
+  audio/
+    whisperSpeech.js           # Node wrapper for the Python worker (stdin/stdout request queue)
+  jev/
+    clauseSplitter.js          # splits compound sentences into clauses
+    client.js                  # Jev API HTTP client (real schema: model/state/questions)
+    knownSites.js               # local fallback for known sites (instagram, x, ...)
+  windows/
+    context.js                  # foreground app + window title, installed apps (PowerShell)
+    executor.js                  # executes the decided actions (PowerShell)
+  overlay/
+    overlay.html                  # status bar UI
+    preload.js                     # secure IPC bridge for the overlay
+python/
+  whisper_worker.py            # persistent Python process: loads the model once, listens on stdin
+  requirements.txt              # faster-whisper, sounddevice, numpy
+```
+
+## Security
+
+- The Jev API key stays only in the local `.env` (don't commit it —
+  already in `.gitignore`).
+- Audio is transcribed entirely on your machine (local faster-whisper)
+  — no voice data leaves your PC.
+- Only the text transcript (short clauses), the foreground app/window,
+  and installed apps are sent to the Jev API.
+
+## Troubleshooting
+
+- **`Library cublas64_12.dll is not found`**: missing CUDA runtime. Run
+  `python/.venv/Scripts/pip install nvidia-cublas-cu12
+  nvidia-cudnn-cu12` (the worker injects those DLLs into PATH on its
+  own, no need to install the full CUDA Toolkit).
+- **Nothing gets recognized / takes too long**: check that the right
+  microphone is set as default in `Settings → System → Sound → Input`.
+  Adjust `SPEECH_INITIAL_SILENCE_SECONDS` /
+  `SPEECH_END_SILENCE_SECONDS` in `.env` if it's cutting off too early
+  or taking too long to respond.
+- **`timeout of XXXXms exceeded` on Jev calls**: increase
+  `JEV_TIMEOUT_MS` in `.env` (the payload grows with the number of
+  installed apps on the machine).
+- **Hotkey doesn't work**: another program might already be using that
+  shortcut. Change `PUSH_TO_TALK_HOTKEY` in `.env` to a different
+  combination.
+- **`open_app`/`open_url` "not found"**: the app needs to show up in
+  the Start menu (`Get-StartApps`) with a similar name, or the site
+  needs to be in `src/jev/knownSites.js`.
+
+---
+
+<a id="jev-voice-windows-pt-br"></a>
+# Jev Voice Windows (PT-BR)
+
+*[English ↑](#jev-voice-windows)*
+
 Controle o Windows por voz: fala → transcrição local com
 [faster-whisper](https://github.com/SYSTRAN/faster-whisper) (roda na
 sua GPU, se tiver uma NVIDIA) → decisão tipada do
