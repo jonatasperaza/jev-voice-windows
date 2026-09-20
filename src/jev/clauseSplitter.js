@@ -1,14 +1,8 @@
 'use strict';
 
-/**
- * Divide uma transcricao com multiplos verbos em clausulas separadas,
- * cada uma enviada individualmente ao Jev (mesma ideia do jev-voice-control
- * no Mac: "open notes and create a new note" -> ["open notes", "create a new note"]).
- *
- * E uma heuristica simples baseada em conectores comuns em portugues e
- * ingles. O Jev decide a acao real; isso so evita mandar uma frase composta
- * de uma vez so, o que reduz a confianca da decisao tipada.
- */
+// Divide "abre o notepad e digita oi" em clausulas separadas, cada uma
+// enviada individualmente ao Jev — frase composta de uma vez so reduz a
+// confianca da decisao tipada.
 
 const CONNECTORS = [
   ' e depois ',

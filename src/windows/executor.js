@@ -1,16 +1,5 @@
 'use strict';
 
-/**
- * Executa as acoes decididas pelo Jev no Windows.
- *
- * Todas as acoes usam PowerShell / utilitarios nativos do Windows, sem
- * dependencias nativas compiladas:
- *  - abrir apps: Start-Process (tenta shell:AppsFolder para apps UWP)
- *  - abrir URLs: Start-Process <url>
- *  - digitar texto / teclas: SendKeys via System.Windows.Forms
- *  - acoes de sistema: comandos especificos (lock, sleep, volume, etc.)
- */
-
 const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
@@ -23,12 +12,10 @@ function runPowerShell(script, { timeout = 5000 } = {}) {
   );
 }
 
-/** Escapa uma string para uso seguro dentro de aspas simples do PowerShell. */
 function psQuote(str) {
   return String(str).replace(/'/g, "''");
 }
 
-/** Escapa uma string para SendKeys (chaves especiais {}, +, ^, %, ~, ()). */
 function sendKeysEscape(str) {
   return String(str).replace(/([+^%~(){}[\]])/g, '{$1}');
 }
@@ -61,10 +48,7 @@ async function typeText(text) {
   await runPowerShell(script);
 }
 
-/**
- * Envia uma combinacao de teclas em formato SendKeys ja pronto
- * (ex: '^s' para Ctrl+S, '%{F4}' para Alt+F4).
- */
+// combo ja em formato SendKeys, ex: '^s' = Ctrl+S, '%{F4}' = Alt+F4
 async function keystroke(sendKeysCombo) {
   const script = `
     Add-Type -AssemblyName System.Windows.Forms
@@ -100,15 +84,10 @@ async function runSystemAction(action) {
   await fn();
 }
 
-/**
- * Ponto de entrada unico: recebe a decisao tipada do Jev e executa a
- * acao correspondente.
- */
 async function execute(decision) {
-  // Cada entrada de decision e sempre {value, confidence} (ver
-  // JevClient.decide). Nao usar `?? decision.X` como fallback: quando
-  // value e legitimamente null/false, isso cairia pro objeto inteiro
-  // {value, confidence} em vez do valor real.
+  // decision.X e sempre {value, confidence}. Nao usar `?? decision.X`
+  // como fallback: quando value e legitimamente null/false, isso
+  // cairia pro objeto {value, confidence} inteiro em vez do valor real.
   const action = decision.action?.value;
 
   switch (action) {

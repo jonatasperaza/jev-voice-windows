@@ -1,20 +1,14 @@
 """
-Worker de reconhecimento de voz local, via faster-whisper (CTranslate2),
-rodando na GPU (CUDA) com fallback pra CPU. Fica vivo o processo inteiro
-(o modelo e carregado uma unica vez) e conversa com o Electron por
-stdin/stdout em linhas JSON:
+Fica vivo o processo inteiro (modelo carregado 1x) e conversa com o
+Electron por stdin/stdout em linhas JSON:
 
   Electron -> worker: {"cmd": "listen", "language": "pt",
                         "maxListenSeconds": 12,
                         "initialSilenceSeconds": 6,
                         "endSilenceSeconds": 1.2}
-  worker -> Electron: {"ready": true}                (uma vez, no boot)
-                       {"text": "..."}                (apos cada listen)
-                       {"error": "..."}                (se algo falhar)
-
-Captura de audio e endpointing (deteccao de inicio/fim de fala) sao
-feitos manualmente aqui via RMS simples, pra nao depender de nenhum
-servico do Windows.
+  worker -> Electron: {"ready": true}   (uma vez, no boot)
+                       {"text": "..."}  (apos cada listen)
+                       {"error": "..."} (se algo falhar)
 """
 
 import sys

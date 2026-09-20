@@ -1,12 +1,8 @@
 'use strict';
 
-/**
- * Fallback local pra sites conhecidos que o usuario pede por nome mas
- * nao sao um app instalado no Windows (ex: "abre o instagram", "vai
- * pro X"). O Jev so devolve respostas categoricas (noul/choice/score),
- * sem tipo de resposta livre — entao nao da pra pedir pra ele "gerar" a
- * URL certa. Isso resolve localmente antes de desistir.
- */
+// Fallback local pra sites conhecidos (ex: "abre o instagram") que nao
+// sao um app instalado. O Jev so devolve respostas categoricas, sem
+// tipo de resposta livre, entao nao da pra pedir a URL certa pra ele.
 
 const KNOWN_SITES = {
   instagram: 'https://instagram.com',
@@ -36,7 +32,6 @@ function normalize(str) {
     .replace(/[̀-ͯ]/g, '');
 }
 
-/** Retorna a URL do site conhecido cujo nome aparece na clausula, ou null. */
 function matchKnownSite(clause) {
   const normClause = normalize(clause);
   for (const [name, url] of Object.entries(KNOWN_SITES)) {

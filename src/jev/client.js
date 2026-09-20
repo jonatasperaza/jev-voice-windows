@@ -1,22 +1,12 @@
 'use strict';
 
 /**
- * Cliente para a API do Jev (TypeSafe AI - "System One").
- *
- * O Jev nao gera texto livre: recebe um payload de estado (a clausula
- * falada, o transcript completo, o app em foco, os apps instalados) mais
- * um dicionario de perguntas tipadas (noul = sim/nao, choice = escolher
- * 1 opcao, score = nota numa escala), e devolve uma resposta calibrada
- * com "confidence" por pergunta. Isso espelha o que os projetos
- * jev-voice-control / jev-voice fazem no Mac.
- *
- * Schema real da API (https://docs.typesafe.ai/api), body:
- *   { model: "jev-latest", state: ..., questions: { <id>: Question } }
- * Question = { type: "noul"|"choice"|"score", instructions, criteria }
+ * Cliente da API do Jev (TypeSafe AI "System One", docs.typesafe.ai/api).
+ * O Jev nao gera texto livre: so devolve respostas categoricas tipadas
+ * (noul = sim/nao, choice = escolher 1 opcao, score = nota numerica),
+ * cada uma com "confidence".
+ * Body: { model: "jev-latest", state, questions: { <id>: Question } }
  * Resposta: { model, answers: { <id>: Answer }, usage }
- *
- * Endpoint: POST https://api.typesafe.ai/v1/systemone
- * Auth: header Authorization: Bearer <TYPESAFE_API_KEY>
  */
 
 const axios = require('axios');
@@ -49,8 +39,6 @@ function pickRelevantApps(installedApps, clause, limit = MAX_TARGET_APP_OPTIONS)
   return installedApps.slice(0, limit);
 }
 
-// Monta o dicionario de perguntas por chamada, porque "target_app"
-// precisa listar os apps instalados como opcoes (criteria) dinamicamente.
 function buildQuestions(installedApps, clause) {
   const targetAppCriteria = { none: 'Nenhum app especifico foi mencionado ou e necessario.' };
   for (const name of pickRelevantApps(installedApps, clause)) {
@@ -100,8 +88,6 @@ function buildQuestions(installedApps, clause) {
   };
 }
 
-// Converte uma Answer da API (noul/choice/score) no formato interno
-// {value, confidence} usado pelo executor.
 function normalizeAnswer(answer) {
   if (!answer) return { value: undefined, confidence: 0 };
 
@@ -137,18 +123,6 @@ class JevClient {
     });
   }
 
-  /**
-   * Envia uma clausula para o Jev decidir o que fazer.
-   *
-   * @param {object} params
-   * @param {string} params.clause - a clausula falada (ja separada pelo clauseSplitter)
-   * @param {string} params.fullTranscript - transcript completo original
-   * @param {string} params.frontmostApp - nome do app em foco no Windows
-   * @param {string} [params.frontmostWindowTitle] - titulo da janela em foco (ex: titulo da aba ativa no Chrome)
-   * @param {string[]} params.installedApps - lista de apps instalados/conhecidos
-   * @param {object} [params.questions] - sobrescreve o dicionario de perguntas padrao
-   * @returns {Promise<{decision: object, confidence: number, belowThreshold: boolean, raw: object}>}
-   */
   async decide({ clause, fullTranscript, frontmostApp, frontmostWindowTitle, installedApps = [], questions }) {
     const payload = {
       model: JEV_MODEL,
@@ -164,18 +138,14 @@ class JevClient {
 
     const { data } = await this.http.post('', payload);
 
-    // Normaliza cada resposta (noul/choice/score) para {value, confidence}
-    // e usa o "none" sentinel de target_app/system_action como ausencia.
     const decision = {};
     for (const [id, answer] of Object.entries(data.answers || {})) {
       const normalized = normalizeAnswer(answer);
-      if (normalized.value === 'none') normalized.value = null;
+      if (normalized.value === 'none') normalized.value = null; // "none" e o sentinel de ausencia nas criteria
       decision[id] = normalized;
     }
 
-    // Confianca da decisao = minimo entre as perguntas respondidas
-    // (mesma regra do jev-voice: "plan confidence is the minimum over
-    // the judgements used").
+    // confianca final = minimo entre as perguntas respondidas
     const confidences = Object.values(decision)
       .map((a) => a.confidence)
       .filter((c) => typeof c === 'number');

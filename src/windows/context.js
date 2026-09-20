@@ -1,12 +1,5 @@
 'use strict';
 
-/**
- * Coleta de contexto do Windows: app + titulo da janela em foco, e
- * lista de apps instalados. Usa PowerShell (presente em qualquer
- * Windows 10/11) em vez de um modulo nativo, para evitar dependencia
- * de compilacao.
- */
-
 const { exec } = require('child_process');
 const util = require('util');
 const execAsync = util.promisify(exec);
@@ -27,12 +20,6 @@ async function runPowerShellScript(script, opts = {}) {
   );
 }
 
-/**
- * Retorna o processo e o titulo da janela em foco numa unica chamada
- * (ex: {processName: "chrome", windowTitle: "Instagram - Google Chrome"}).
- * O titulo da janela do Chrome inclui o titulo da aba ativa — util pro
- * Jev reconhecer o que esta aberto sem precisar ler todas as abas.
- */
 async function getFrontmostWindow() {
   const script = `
     Add-Type @"
@@ -69,10 +56,6 @@ async function getFrontmostWindow() {
   }
 }
 
-/**
- * Retorna a lista de apps instalados (nomes "amigaveis", como aparecem
- * no menu iniciar), via Get-StartApps. Resultado e cacheado.
- */
 async function getInstalledApps({ forceRefresh = false } = {}) {
   const now = Date.now();
   if (!forceRefresh && _appsCache && now - _appsCacheAt < APPS_CACHE_TTL_MS) {

@@ -1,15 +1,10 @@
 'use strict';
 
 /**
- * Reconhecimento de voz local via faster-whisper (Python), rodando na
- * GPU quando disponivel (CUDA). O processo Python fica vivo o app
- * inteiro — o modelo Whisper e carregado uma unica vez no boot — e o
- * Node conversa com ele por stdin/stdout em linhas JSON (ver
- * python/whisper_worker.py para o protocolo).
- *
- * Substitui o antigo caminho via PowerShell/SAPI: sem depender de
- * idioma de exibicao do Windows nem de aceitar politica de privacidade
- * de fala online — tudo roda offline, na maquina.
+ * O processo Python fica vivo o app inteiro (carregar o modelo Whisper
+ * custa segundos, entao nao da pra reiniciar a cada hotkey). Node
+ * conversa com ele por stdin/stdout em linhas JSON — ver
+ * python/whisper_worker.py para o protocolo.
  */
 
 const path = require('path');
@@ -84,7 +79,7 @@ class WhisperSpeechRecognizer {
       return;
     }
 
-    if (msg.log) return; // logs vao pro stderr, nao deveria cair aqui, mas ignora por seguranca
+    if (msg.log) return;
 
     const pending = this.queue.shift();
     if (!pending) return;
@@ -93,15 +88,10 @@ class WhisperSpeechRecognizer {
     else pending.resolve(msg.text || '');
   }
 
-  /** Resolve quando o modelo terminou de carregar e o worker esta pronto. */
   async ready() {
     return this.readyPromise;
   }
 
-  /**
-   * Escuta o microfone padrao ate reconhecer uma frase (ou estourar o
-   * timeout) e retorna o texto transcrito ("" se nada foi reconhecido).
-   */
   async listenOnce() {
     await this.readyPromise;
     return new Promise((resolve, reject) => {

@@ -20,11 +20,6 @@ let speech = null;
 let jev = null;
 let busy = false;
 
-// ---------------------------------------------------------------------
-// Overlay: janela transparente, always-on-top, sem foco, mostrando o
-// status atual (idle / ouvindo / transcrevendo / pensando / executando /
-// erro), igual ao overlay do jev-voice no Mac.
-// ---------------------------------------------------------------------
 function createOverlay() {
   const { width } = screen.getPrimaryDisplay().workAreaSize;
 
@@ -56,9 +51,6 @@ function setOverlayStatus(status, detail = '') {
   overlayWindow.webContents.send('status', { status, detail });
 }
 
-// ---------------------------------------------------------------------
-// Tray icon
-// ---------------------------------------------------------------------
 function createTray() {
   const icon = nativeImage.createFromPath(
     path.join(__dirname, '..', 'assets', 'icon.png')
@@ -74,13 +66,8 @@ function createTray() {
   tray.setContextMenu(menu);
 }
 
-// ---------------------------------------------------------------------
-// Fluxo principal: um unico toque no hotkey comeca a ouvir. O motor de
-// fala nativo do Windows (SAPI) detecta sozinho quando a fala termina
-// (endpointing), entao nao precisa apertar de novo para parar.
-// ---------------------------------------------------------------------
 async function onHotkey() {
-  if (busy) return; // ignora novo toque enquanto ja esta ouvindo/processando
+  if (busy) return;
   busy = true;
   setOverlayStatus('listening');
 
@@ -155,9 +142,6 @@ async function handleTranscript(transcript) {
   setTimeout(() => setOverlayStatus('idle'), 1500);
 }
 
-// ---------------------------------------------------------------------
-// Bootstrap
-// ---------------------------------------------------------------------
 app.whenReady().then(async () => {
   try {
     speech = new WhisperSpeechRecognizer({
