@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+<meta charset="UTF-8" />
+<title>Jev Voice</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: transparent;
+    overflow: hidden;
+    font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+
+  #bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    height: 40px;
+    margin: 8px;
+    padding: 0 16px;
+    border-radius: 20px;
+    background: rgba(20, 20, 24, 0.85);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.35);
+    color: #f2f2f2;
+    font-size: 13px;
+    transition: box-shadow 0.2s ease;
+  }
+
+  #dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #6b6b6b;
+    flex-shrink: 0;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  #label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .idle #dot { background: #6b6b6b; }
+  .loading #dot { background: #8b5cf6; box-shadow: 0 0 8px #8b5cf6; }
+  .listening #dot { background: #e5484d; box-shadow: 0 0 8px #e5484d; }
+  .transcribing #dot { background: #f5d90a; box-shadow: 0 0 8px #f5d90a; }
+  .thinking #dot { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+  .executing #dot { background: #3b82f6; box-shadow: 0 0 8px #3b82f6; }
+  .done #dot { background: #30a46c; box-shadow: 0 0 8px #30a46c; }
+  .error #dot { background: #f5a623; box-shadow: 0 0 8px #f5a623; }
+</style>
+</head>
+<body>
+  <div id="bar" class="idle">
+    <div id="dot"></div>
+    <div id="label">Jev Voice pronto — pressione o hotkey para falar</div>
+  </div>
+
+  <script>
+    const bar = document.getElementById('bar');
+    const label = document.getElementById('label');
+
+    const LABELS = {
+      idle: 'Pronto — pressione o hotkey para falar',
+      loading: 'Carregando modelo de voz (Whisper)...',
+      listening: 'Ouvindo... (pare de falar para reconhecer)',
+      thinking: (detail) => `Jev decidindo: "${detail}"`,
+      executing: (detail) => `Executando: ${detail}`,
+      done: 'Feito',
+      error: (detail) => `Erro: ${detail}`,
+    };
+
+    window.jevVoice.onStatus(({ status, detail }) => {
+      bar.className = status;
+      const l = LABELS[status];
+      label.textContent = typeof l === 'function' ? l(detail || '') : (l || status);
+    });
+  </script>
+</body>
+</html>
